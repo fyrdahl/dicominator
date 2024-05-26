@@ -1,0 +1,72 @@
+# DICOMinator 🌊
+
+DICOMinator is an open-source Python script that sorts and converts DICOM files from common 4D Flow pulse sequences.
+
+## Features ✨
+
+- 📂 Recursively traverses the input directory to find all DICOM files.
+- 📂 Sorts the DICOM files into a specified output directory based on encoding direction.
+- 💾 Provides options to save the sorted data in various formats:
+    - 📦 NIfTI: The NIfTI files are split along the time dimension, allowing them to be imported as a MultiVolume in [3D Slicer](https://www.slicer.org/).
+    - 📦 h5: The h5 format should be compatible with Edward Ferdian's [4DFlowNet](https://github.com/edwardferdian/4DFlowNet).
+    - 📦 mat: The mat format should be compatible with Julio Sotelo's [4D-Flow-Matlab-Toolbox](https://github.com/juliosotelo/4D-Flow-Matlab-Toolbox).
+
+
+## Installation 🛠️
+
+1. Clone the repository:
+    ```sh
+    git clone https://github.com/fyrdahl/dicominator.git
+    cd dicominator
+    ```
+
+2. Install the required dependencies:
+    ```sh
+    pip install -r requirements.txt
+    ```
+
+## Prerequisites 📋
+
+- Python 3.6 or higher
+- Required Python libraries (listed in `requirements.txt`)
+
+## Usage 🚀
+
+### Arguments
+
+- `input_root`: The root folder where DICOMs are stored.
+- `output_root`: The root folder where DICOMs will be stored (will be created if it does not exist).
+- `-d`, `--desc`: Optional 'SeriesDescription' to search for.
+- `-p`, `--purge`: Purge the output folder before processing.
+- `--nii`: Save as NIfTI.
+- `--h5`: Save as h5.
+- `--mat`: Save as mat.
+- `-l`, `--list`: List all unique Series Descriptions in the dataset without further processing.
+
+### Example
+
+```sh
+python dicominator.py /path/to/input /path/to/output --name "4D Flow" --nii --h5 --mat
+```
+
+## Contact 📧
+
+For support, please contact alexander.fyrdahl@ki.se or open an issue.
+
+## Acknowledgments 🙏
+
+- Edward Ferdian for [4DFlowNet](https://github.com/edwardferdian/4DFlowNet)
+- Julio Sotelo for [4D-Flow-Matlab-Toolbox](https://github.com/juliosotelo/4D-Flow-Matlab-Toolbox)
+- Pia Callmer for contributing code
+
+## Contributing 🤝
+
+Contributions are welcome! Is your 4D Flow sequence not supported? Please feel free to open an issue or submit a pull request.
+
+## Code Formatting
+
+This project uses [Ruff](https://github.com/astral-sh/ruff) for code formatting.
+
+## License 📄
+
+This project is licensed under the [MIT License](LICENSE).

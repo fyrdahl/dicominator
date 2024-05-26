@@ -1,0 +1,6 @@
+h5py
+nibabel
+numpy
+scipy
+pydicom
+tqdm
