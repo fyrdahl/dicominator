@@ -46,7 +46,7 @@ DICOMinator is an open-source Python script that sorts and converts DICOM files 
 ### Example
 
 ```sh
-python dicominator.py /path/to/input /path/to/output --name "4D Flow" --nii --h5 --mat
+python dicominator.py /path/to/input /path/to/output --desc "4D Flow" --nii --h5 --mat
 ```
 
 ## Contact 📧
