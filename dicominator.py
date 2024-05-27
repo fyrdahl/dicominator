@@ -45,6 +45,7 @@ def dicominator(
     save_as_mat=False,
     save_as_nii=False,
     list_descriptions=False,
+    force=False,
 ):
     """
     DICOMinator main routine.
@@ -72,6 +73,9 @@ def dicominator(
 
     # TODO: Define a list of ALL valid DICOM extensions
     dicom_extensions = ["dcm", "IMA", "dicom"]
+
+    if force:
+        logging.info("Force assumes that all datasets are flow datasets. Use with caution!")
 
     dcm_files = []
     for ext in dicom_extensions:
@@ -105,7 +109,7 @@ def dicominator(
             descriptions.append(ds.SeriesDescription)
             if protocol_name not in flow_status:
                 flow_status[protocol_name] = False
-            if is_flow_dataset(ds):
+            if is_flow_dataset(ds, force=force):
                 flow_status[protocol_name] = True
                 subfolders_to_process.add(base_desc)
         else:
@@ -113,7 +117,7 @@ def dicominator(
                 continue
             descriptions.append(ds.SeriesDescription)
             dcm_to_process.append(file_path)
-            if is_flow_dataset(ds):
+            if is_flow_dataset(ds, force=force):
                 subfolders_to_process.add(base_desc)
 
     if list_descriptions:
@@ -127,7 +131,9 @@ def dicominator(
 
         logging.info("Unique Series Descriptions:")
         for desc in sorted(unique_descriptions):
-            if any(
+            if force:
+                logging.info(f"- {desc} (Assumed to be a flow dataset by --force)")
+            elif any(
                 flow_status[protocol_name]
                 for protocol_name in flow_status
                 if protocol_name.startswith(desc)
@@ -198,7 +204,7 @@ def get_base_desc(series_description):
     return series_description
 
 
-def is_flow_dataset(ds):
+def is_flow_dataset(ds, force=False):
     """
     Check if a DICOM dataset is likely to be a flow dataset.
 
@@ -208,6 +214,8 @@ def is_flow_dataset(ds):
     Returns:
         bool: True if the dataset is likely to be a flow dataset, False otherwise.
     """
+    if force:
+        return True
     try:
         # Check the presence of velocity encoding
         if not hasattr(ds, "SequenceName"):
@@ -863,6 +871,12 @@ if __name__ == "__main__":
         action="store_true",
         help="list all unique Series Descriptions in the dataset without further processing",
     )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="force process files thay may or may not be 4D flow datasets",
+    )
 
     args = parser.parse_args()
 
@@ -896,4 +910,5 @@ if __name__ == "__main__":
         save_as_mat=args.mat,
         save_as_nii=args.nii,
         list_descriptions=args.list,
+        force=args.force,
     )
