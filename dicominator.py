@@ -879,7 +879,7 @@ if __name__ == "__main__":
         "-f",
         "--force",
         action="store_true",
-        help="force process files thay may or may not be 4D flow datasets",
+        help="force process files thay may or may not be flow datasets",
     )
 
     args = parser.parse_args()

@@ -42,6 +42,7 @@ DICOMinator is an open-source Python script that sorts and converts DICOM files 
 - `--h5`: Save as h5.
 - `--mat`: Save as mat.
 - `-l`, `--list`: List all unique Series Descriptions in the dataset without further processing.
+- `-f`, `--force`: Force process files thay may or may not be flow datasets.
 
 ### Example
 
