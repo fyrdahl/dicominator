@@ -703,16 +703,16 @@ def resolve_in_or_through_folders(output_root):
                     os.rename(source_folder, destination_folder)
                     logging.info(f"Renamed {candidate} to {missing_folder}")
                 except FileExistsError:
-                    logging.info(
+                    logging.warning(
                         f"Destination folder {missing_folder} already exists. Skipping renaming."
                     )
                 except OSError as e:
-                    logging.info(
+                    logging.warning(
                         f"Error occurred while renaming {candidate} to {missing_folder}: {str(e)}"
                     )
             else:
-                logging.info(
-                    "Ambiguity detected: multiple candidates or multiple missing folders."
+                logging.warning(
+                    "Ambiguity detected: multiple candidates OR multiple missing folders."
                 )
 
 
