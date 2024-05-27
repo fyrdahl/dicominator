@@ -9,7 +9,7 @@ DICOMinator is an open-source Python script that sorts and converts DICOM files 
 - 💾 Provides options to save the sorted data in various formats:
     - 📦 NIfTI: The NIfTI files are split along the time dimension, allowing them to be imported as a MultiVolume in [3D Slicer](https://www.slicer.org/).
     - 📦 h5: The h5 format should be compatible with Edward Ferdian's [4DFlowNet](https://github.com/edwardferdian/4DFlowNet).
-    - 📦 mat: The mat format should be compatible with Julio Sotelo's [4D-Flow-Matlab-Toolbox](https://github.com/juliosotelo/4D-Flow-Matlab-Toolbox).
+    - 📦 mat: The mat format should be compatible with Julio Sotelo's [4D-Flow-Matlab-Toolbox](https://github.com/JulioSoteloParraguez/4D-Flow-Matlab-Toolbox).
 
 
 ## Installation 🛠️
@@ -56,7 +56,7 @@ For support, please contact alexander.fyrdahl@ki.se or open an issue.
 ## Acknowledgments 🙏
 
 - Edward Ferdian for [4DFlowNet](https://github.com/edwardferdian/4DFlowNet)
-- Julio Sotelo for [4D-Flow-Matlab-Toolbox](https://github.com/juliosotelo/4D-Flow-Matlab-Toolbox)
+- Julio Sotelo for [4D-Flow-Matlab-Toolbox](https://github.com/JulioSoteloParraguez/4D-Flow-Matlab-Toolbox)
 - Pia Callmer for contributing code
 
 ## Contributing 🤝
