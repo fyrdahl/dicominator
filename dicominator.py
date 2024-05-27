@@ -176,7 +176,7 @@ def dicominator(
 
         # Perform post-processing steps for each processed subfolder
         for series_description in subfolders_to_process:
-            subfolder = os.path.join(output_root, series_description)
+            subfolder = os.path.join(output_root, sanitize_name(series_description))
             resolve_in_or_through_folders(subfolder)
             if save_as_h5 or save_as_mat or save_as_nii:
                 required_folders = {"MAG", "RL", "AP", "FH"}
@@ -320,10 +320,10 @@ def process_and_save_data(output_root, save_as_h5, save_as_mat, save_as_nii):
         data = prepare_data_for_saving(
             image_data, venc_data, pos_pat, tt_pat, sample_ds
         )
-        if save_as_h5:
-            save_h5_file(output_root, file_name, data)
-        if save_as_mat:
-            save_mat_file(output_root, file_name, data)
+    if save_as_h5:
+        save_h5_file(output_root, file_name, data)
+    if save_as_mat:
+        save_mat_file(output_root, file_name, data)
 
 
 def initialize_data_structures(rows, cols, images_tot):
@@ -516,7 +516,7 @@ def prepare_data_for_saving(image_data, venc_data, pos_pat, tt_pat, sample_ds):
         image_data[key] = (image_data[key] / phaseRange) * venc_data[key]
     tt = np.unique(tt_pat["MAG"]) * 10**-3
 
-    data = {
+    return {
         "MR_FFE_FH": image_data["MAG"],
         "MR_FFE_AP": image_data["MAG"],
         "MR_FFE_RL": image_data["MAG"],
@@ -535,8 +535,6 @@ def prepare_data_for_saving(image_data, venc_data, pos_pat, tt_pat, sample_ds):
         "type": "DCM",
         "dt": np.mean(np.diff(tt)),
     }
-
-    return data
 
 
 def save_h5_file(output_root, file_name, data):
@@ -563,7 +561,7 @@ def save_h5_file(output_root, file_name, data):
 
     with h5py.File(os.path.join(output_root, f"{file_name}.h5"), "w") as f:
         for key, value in data.items():
-            if key in rename_h5.keys():
+            if key in rename_h5:
                 f.create_dataset(rename_h5[key], data=value)
 
         f.create_dataset("u_max", data=data["VENC"][0])
@@ -674,12 +672,12 @@ def resolve_in_or_through_folders(output_root):
         FileExistsError: If the destination folder already exists during the renaming process.
         OSError: If an error occurs during the renaming process.
     """
-    required_folders = {"RL", "AP", "FH"}
     existing_folders = set(os.listdir(output_root))
     rename_candidates = {"IN", "THROUGH"}
 
     candidates_found = rename_candidates.intersection(existing_folders)
     if candidates_found:
+        required_folders = {"RL", "AP", "FH"}
         missing_folders = required_folders.difference(existing_folders)
         if missing_folders:
             if len(candidates_found) == 1 and len(missing_folders) == 1:
