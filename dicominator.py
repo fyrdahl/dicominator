@@ -262,7 +262,7 @@ def split_and_save_multiframe_dicom(ds, base_name, output_root):
         new_ds.PixelData = sub_array.tobytes()
         new_ds.NumberOfFrames = 1
         new_base_name = f"{base_name.split('.dcm')[0]}_frame_{i + 1}.dcm"
-        output_path = get_output_path(new_ds, output_root, new_base_name)
+        output_path = get_output_path(new_ds, output_root)
         if output_path:
             save_dicom(new_ds, output_path, new_base_name)
 
