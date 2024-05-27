@@ -230,7 +230,6 @@ def is_flow_dataset(ds, force=False):
         required_tags = [
             "PixelSpacing",
             "SliceThickness",
-            "NumberOfTemporalPositions",
             "TriggerTime",
             "Rows",
             "Columns",
@@ -291,7 +290,12 @@ def process_and_save_data(output_root, save_as_h5, save_as_mat, save_as_nii):
     )
 
     sample_ds = pydicom.read_file(processed_files[0])
-    num_cardiac_phases = int(sample_ds.NumberOfTemporalPositions)
+    if hasattr(sample_ds, "NumberOfTemporalPositions"):
+        num_cardiac_phases = int(sample_ds.NumberOfTemporalPositions)
+    elif hasattr(sample_ds, "CardiacNumberOfImages"):
+        num_cardiac_phases = int(sample_ds.CardiacNumberOfImages)
+    else:
+        num_cardiac_phases = 1
     num_slices = int(len(processed_files) / num_cardiac_phases / 4)
     logging.info(
         f"Dataset has {num_slices} slices with {num_cardiac_phases} cardiac phases"
