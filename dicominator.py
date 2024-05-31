@@ -805,7 +805,7 @@ def get_flow_direction(ds):
     )
 
 
-def is_valid_path(parser, arg, check_existence=True):
+def is_valid_input_path(parser, arg, check_existence=True):
     """
     Check if the given path is valid.
 
@@ -824,10 +824,10 @@ def is_valid_path(parser, arg, check_existence=True):
         return arg
 
     if not isinstance(arg, str) or arg.strip() == "":
-        parser.error(f"The path {arg} is not a valid path string.")
+        parser.error(f"The input path {arg} is not a valid path string.")
 
     if check_existence and not os.path.exists(arg):
-        parser.error(f"The path {arg} does not exist.")
+        parser.error(f"The input path {arg} does not exist.")
 
     return arg
 
@@ -846,7 +846,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "input_root",
-        type=lambda x: is_valid_path(parser, x),
+        type=lambda x: is_valid_input_path(parser, x),
         help="the root of the folder where DICOMs are stored",
     )
     parser.add_argument(
