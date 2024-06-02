@@ -72,13 +72,19 @@ def dicominator(
         raise ValueError("Output root directory must be provided")
 
     if force:
-        logging.info("Force assumes that all datasets are flow datasets. Use with caution!")
+        logging.info(
+            "Force assumes that all datasets are flow datasets. Use with caution!"
+        )
 
-    dcm_files = []
-    for ext in ["dcm", "dicom", "dic", "ima"]:
+    dcm_files = set()
+    for ext in ["dc", "dcm", "dic", "dicom", "ima", "img"]:
         pattern = re.compile(f"(?i).*\\.{ext}$")
-        dcm_files.extend(
-            [f for f in glob.glob(os.path.join(input_root, "**/*"), recursive=True) if pattern.match(f)]
+        dcm_files.update(
+            [
+                f
+                for f in glob.glob(os.path.join(input_root, "**/*"), recursive=True)
+                if pattern.match(f)
+            ]
         )
     logging.info(f"Found {len(dcm_files)} DICOM files in {input_root}")
 
