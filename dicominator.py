@@ -96,7 +96,7 @@ def dicominator(
             if description
             else "No filter applied"
         )
-        logging.info(f"Output will be saved in {output_root}")
+        logging.info(f"Sorted data will be saved in {output_root}")
 
     descriptions = []
     dcm_to_process = []
