@@ -279,7 +279,7 @@ def process_and_save_data(output_root, save_as_h5, save_as_mat, save_as_nii):
 
     file_name = os.path.basename(output_root)
     processed_files = glob.glob(os.path.join(output_root, "**/*"), recursive=True)
-    processed_files = [f for f in processed_files if os.path.isdir(f)]
+    processed_files = [f for f in processed_files if os.path.isfile(f)]
 
     logging.info(
         f"Found {len(processed_files)} files with SeriesDescription {file_name}"
