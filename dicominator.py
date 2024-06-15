@@ -754,19 +754,22 @@ def get_output_path(ds, output_root):
     sub_folder = None
 
     # TODO: This will currently catch speed images as MAG, need to find a better way to differentiate
-    if ds.ImageType[1] == "PRIMARY" and ds.ImageType[2].startswith("M"):
-        sub_folder = "MAG"
-    elif (
-        ds.ImageType[0] == "DERIVED"
-        and ds.ImageType[1] == "PRIMARY"
-        and ds.ImageType[2].startswith("M")
-    ):
-        sub_folder = "MAG"
-    elif ds.ImageType[2] == "P":
-        sub_folder = get_flow_direction(ds)
+    try:
+        if ds.ImageType[1] == "PRIMARY" and ds.ImageType[2].startswith("M"):
+            sub_folder = "MAG"
+        elif (
+            ds.ImageType[0] == "DERIVED"
+            and ds.ImageType[1] == "PRIMARY"
+            and ds.ImageType[2].startswith("M")
+        ):
+            sub_folder = "MAG"
+        elif ds.ImageType[2] == "P":
+            sub_folder = get_flow_direction(ds)
 
-    if sub_folder:
-        return os.path.join(output_root, sub_folder)
+        if sub_folder:
+            return os.path.join(output_root, sub_folder)
+    except FlowDirectionNotFoundError:
+        return None
 
 
 def get_flow_direction(ds):
