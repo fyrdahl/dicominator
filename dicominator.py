@@ -278,7 +278,7 @@ def process_and_save_data(output_root, save_as_h5, save_as_mat, save_as_nii):
         return
 
     file_name = os.path.basename(output_root)
-    processed_files = glob.glob(os.path.join(output_root, "**/*.dcm"), recursive=True)
+    processed_files = glob.glob(os.path.join(output_root, "**/*"), recursive=True)
     logging.info(
         f"Found {len(processed_files)} files with SeriesDescription {file_name}"
     )
