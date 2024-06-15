@@ -86,7 +86,20 @@ def dicominator(
                 if pattern.match(f)
             ]
         )
-    logging.info(f"Found {len(dcm_files)} DICOM files in {input_root}")
+
+    if not dcm_files:
+        logging.info("No files with known DICOM extensions found.")
+        logging.info(
+            "Its possible the exam was exported with the Create DICOM File System option turned on."
+        )
+        for file_path in glob.glob(os.path.join(input_root, "**/*"), recursive=True):
+            if not os.path.splitext(file_path)[1] and os.path.isfile(file_path):
+                dcm_files.add(file_path)
+        logging.info(
+            f"Found {len(dcm_files)} extensionless files in {input_root} that could be DICOM files"
+        )
+    else:
+        logging.info(f"Found {len(dcm_files)} DICOM files in {input_root}")
 
     if list_descriptions:
         logging.info("Listing unique Series Descriptions")
