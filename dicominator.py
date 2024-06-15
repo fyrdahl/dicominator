@@ -111,108 +111,81 @@ def dicominator(
         )
         logging.info(f"Sorted data will be saved in {output_root}")
 
-    descriptions = []
-    dcm_to_process = []
-    multi_dicom = False
+    descriptions = set()
     flow_status = {}
     subfolders_to_process = set()
 
     for file_path in tqdm(dcm_files, desc="Processing files"):
         with pydicom.dcmread(file_path, stop_before_pixels=True) as ds:
-            protocol_name = ds.ProtocolName
-            base_desc = get_base_desc(ds.SeriesDescription)
+            protocol_name = getattr(ds, "ProtocolName", None)
+            if protocol_name:
+                base_desc = get_base_desc(ds.SeriesDescription)
+                descriptions.add(ds.SeriesDescription)
 
-        if list_descriptions:
-            descriptions.append(ds.SeriesDescription)
-            if protocol_name not in flow_status:
-                flow_status[protocol_name] = False
-            if is_flow_dataset(ds, force=force):
-                flow_status[protocol_name] = True
-                subfolders_to_process.add(base_desc)
-        else:
-            if description and not base_desc.startswith(description):
-                continue
-            descriptions.append(ds.SeriesDescription)
-            dcm_to_process.append(file_path)
-            if is_flow_dataset(ds, force=force):
-                subfolders_to_process.add(base_desc)
+                if list_descriptions or is_flow_dataset(ds, force=force):
+                    if list_descriptions:
+                        if protocol_name not in flow_status:
+                            flow_status[protocol_name] = False
+                        if is_flow_dataset(ds, force=force):
+                            flow_status[protocol_name] = True
+                            subfolders_to_process.add(base_desc)
+                    else:
+                        if not description or base_desc.startswith(description):
+                            if is_flow_dataset(ds, force=force):
+                                subfolders_to_process.add(base_desc)
+                            subfolder = os.path.join(
+                                output_root, sanitize_name(base_desc)
+                            )
+                            base_name = os.path.basename(file_path)
+
+                            # Load the full file
+                            with pydicom.dcmread(
+                                file_path, stop_before_pixels=False
+                            ) as ds:
+                                if getattr(ds, "NumberOfFrames", 0) > 1:
+                                    split_and_save_multiframe_dicom(
+                                        ds, base_name, subfolder
+                                    )
+                                else:
+                                    output_path = get_output_path(ds, subfolder)
+                                    if output_path:
+                                        save_dicom(ds, output_path, base_name)
 
     if list_descriptions:
-        unique_descriptions = set()
-        for desc in sorted(descriptions):
-            if desc.endswith("_P"):
-                base_desc = desc[:-2]
-                if base_desc in descriptions:
-                    continue
-            unique_descriptions.add(desc)
-
-        logging.info("Unique Series Descriptions:")
-        for desc in sorted(unique_descriptions):
-            if force:
-                logging.info(f"- {desc} (Assumed to be a flow dataset by --force)")
-            elif any(
-                flow_status[protocol_name]
-                for protocol_name in flow_status
-                if protocol_name.startswith(desc)
-            ):
-                logging.info(f"- {desc} (Likely a flow dataset)")
-            else:
-                logging.info(f"- {desc}")
+        display_descriptions(descriptions, flow_status, force)
     else:
-        filtered_dcm_to_process = []
-        filtered_descriptions = []
-        for file_path, desc in zip(dcm_to_process, descriptions):
-            base_desc = get_base_desc(desc)
-            if base_desc in subfolders_to_process:
-                filtered_dcm_to_process.append(file_path)
-                filtered_descriptions.append(desc)
-
-        # Create subfolders for each series description
-        # for base_desc in subfolders_to_process:
-        #    subfolder = os.path.join(output_root, base_desc)
-        #    os.makedirs(subfolder, exist_ok=True)
-
-        for file_path, desc in tqdm(
-            zip(filtered_dcm_to_process, filtered_descriptions),
-            desc="Sorting files",
-            total=len(descriptions),
-        ):
-            base_desc = get_base_desc(desc)
-
-            if base_desc not in subfolders_to_process:
-                continue
-
-            subfolder = os.path.join(output_root, sanitize_name(base_desc))
-            base_name = os.path.basename(file_path)
-
-            # Load the full file
-            with pydicom.dcmread(file_path, stop_before_pixels=False) as ds:
-                if getattr(ds, "NumberOfFrames", 0) > 1:
-                    if not multi_dicom:
-                        logging.info("Found multi-frame DICOM files. Splitting...")
-                        multi_dicom = True
-                    split_and_save_multiframe_dicom(ds, base_name, subfolder)
-                else:
-                    output_path = get_output_path(ds, subfolder)
-                    if output_path:
-                        save_dicom(ds, output_path, base_name)
-
         # Perform post-processing steps for each processed subfolder
         for series_description in subfolders_to_process:
             subfolder = os.path.join(output_root, sanitize_name(series_description))
-            resolve_in_or_through_folders(subfolder)
+            try:
+                validate_folder_structure(subfolder)
+            except Exception as e:
+                logging.warning(f"{series_description}: {e}")
+                continue
             if save_as_h5 or save_as_mat or save_as_nii:
-                required_folders = {"MAG", "RL", "AP", "FH"}
-                existing_folders = set(os.listdir(subfolder))
-                missing_folders = required_folders.difference(existing_folders)
-                if missing_folders:
-                    logging.warning(
-                        f"Missing required folders {missing_folders} for {series_description}. Skipping..."
-                    )
-                    continue
-
                 process_and_save_data(subfolder, save_as_h5, save_as_mat, save_as_nii)
-        logging.info("Done!")
+
+    logging.info("Done!")
+
+
+def display_descriptions(descriptions, flow_status, force):
+    unique_descriptions = {
+        desc
+        for desc in sorted(descriptions)
+        if not desc.endswith("_P") or desc[:-2] not in descriptions
+    }
+    logging.info("Unique Series Descriptions:")
+    for desc in sorted(unique_descriptions):
+        if force:
+            logging.info(f"- {desc} (Assumed to be a flow dataset by --force)")
+        elif any(
+            flow_status[protocol_name]
+            for protocol_name in flow_status
+            if protocol_name.startswith(desc)
+        ):
+            logging.info(f"- {desc} (Likely a flow dataset)")
+        else:
+            logging.info(f"- {desc}")
 
 
 def get_base_desc(series_description):
