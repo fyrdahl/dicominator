@@ -660,13 +660,16 @@ def save_dicom(ds, output_path, base_name):
         raise
 
 
-def resolve_in_or_through_folders(output_root):
+def validate_folder_structure(output_root):
     """
-    Resolve ambiguity between "IN" or "THROUGH" folders by renaming them to the missing required folder.
+    Ensure the folder structure is compliant and resolve ambiguity between "IN" or "THROUGH" folders.
 
-    The function checks for the presence of "IN" or "THROUGH" folders in the output root directory.
-    If either of these folders is found and there is exactly one missing required folder (RL, AP, or FH),
-    the function renames the "IN" or "THROUGH" folder to the missing required folder.
+    The function checks if the required folder MAG exists in the output root directory.
+    If MAG is missing, an exception is raised.
+
+    The function then checks for the presence of "IN" or "THROUGH" folders in the output root directory.
+    If either of these folders is found and there is exactly one missing folder among AP, RL, or FH,
+    the function renames the "IN" or "THROUGH" folder to the missing folder.
 
     Args:
         output_root (str): The root directory containing the sub-folders.
@@ -677,37 +680,51 @@ def resolve_in_or_through_folders(output_root):
     Raises:
         FileExistsError: If the destination folder already exists during the renaming process.
         OSError: If an error occurs during the renaming process.
+        Exception: If the folder structure is non-compliant and cannot be resolved.
     """
+
     existing_folders = set(os.listdir(output_root))
+
+    # Check if the required folder MAG exists
+    if "MAG" not in existing_folders:
+        raise Exception("Non-compliant folder structure. Missing required folder: MAG")
+
     rename_candidates = {"IN", "THROUGH"}
+    required_folders = {"AP", "RL", "FH"}
 
+    # Check if there are any rename candidates and missing required folders
     candidates_found = rename_candidates.intersection(existing_folders)
-    if candidates_found:
-        required_folders = {"RL", "AP", "FH"}
-        missing_folders = required_folders.difference(existing_folders)
-        if missing_folders:
-            if len(candidates_found) == 1 and len(missing_folders) == 1:
-                candidate = candidates_found.pop()
-                missing_folder = missing_folders.pop()
+    missing_required_folders = required_folders - existing_folders
+    if candidates_found and missing_required_folders:
+        if len(candidates_found) == 1 and len(missing_required_folders) == 1:
+            candidate = candidates_found.pop()
+            missing_folder = missing_required_folders.pop()
 
-                source_folder = os.path.join(output_root, candidate)
-                destination_folder = os.path.join(output_root, missing_folder)
+            source_folder = os.path.join(output_root, candidate)
+            destination_folder = os.path.join(output_root, missing_folder)
 
-                try:
-                    os.rename(source_folder, destination_folder)
-                    logging.info(f"Renamed {candidate} to {missing_folder}")
-                except FileExistsError:
-                    logging.warning(
-                        f"Destination folder {missing_folder} already exists. Skipping renaming."
-                    )
-                except OSError as e:
-                    logging.warning(
-                        f"Error occurred while renaming {candidate} to {missing_folder}: {str(e)}"
-                    )
-            else:
+            try:
+                os.rename(source_folder, destination_folder)
+                logging.info(f"Renamed {candidate} to {missing_folder}")
+            except FileExistsError:
                 logging.warning(
-                    "Ambiguity detected: multiple candidates OR multiple missing folders."
+                    f"Destination folder {missing_folder} already exists. Skipping renaming."
                 )
+            except OSError as e:
+                logging.warning(
+                    f"Error occurred while renaming {candidate} to {missing_folder}: {str(e)}"
+                )
+        else:
+            logging.warning(
+                "Ambiguity detected: multiple candidates OR multiple missing required folders."
+            )
+
+    # Final check for compliant folder structure
+    if missing_required_folders:
+        missing_folders_str = ", ".join(missing_required_folders)
+        raise Exception(
+            f"Non-compliant folder structure. Missing folders: {missing_folders_str}"
+        )
 
 
 def get_output_path(ds, output_root):
