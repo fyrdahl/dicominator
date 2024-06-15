@@ -660,7 +660,7 @@ def save_dicom(ds, output_path, base_name):
         raise
 
 
-def validate_folder_structure(output_root):
+def validate_folder_structure(subfolder_root):
     """
     Ensure the folder structure is compliant and resolve ambiguity between "IN" or "THROUGH" folders.
 
@@ -672,7 +672,7 @@ def validate_folder_structure(output_root):
     the function renames the "IN" or "THROUGH" folder to the missing folder.
 
     Args:
-        output_root (str): The root directory containing the sub-folders.
+        subfolder_root (str): The root directory containing the sub-folders.
 
     Returns:
         None
@@ -683,7 +683,7 @@ def validate_folder_structure(output_root):
         Exception: If the folder structure is non-compliant and cannot be resolved.
     """
 
-    existing_folders = set(os.listdir(output_root))
+    existing_folders = set(os.listdir(subfolder_root))
 
     # Check if the required folder MAG exists
     if "MAG" not in existing_folders:
@@ -700,22 +700,24 @@ def validate_folder_structure(output_root):
             candidate = candidates_found.pop()
             missing_folder = missing_required_folders.pop()
 
-            source_folder = os.path.join(output_root, candidate)
-            destination_folder = os.path.join(output_root, missing_folder)
+            source_folder = os.path.join(subfolder_root, candidate)
+            destination_folder = os.path.join(subfolder_root, missing_folder)
 
             try:
                 os.rename(source_folder, destination_folder)
-                logging.info(f"Renamed {candidate} to {missing_folder}")
+                logging.info(
+                    f"{os.path.basename(subfolder_root)}: Renamed {candidate} to {missing_folder}"
+                )
             except FileExistsError:
-                logging.warning(
+                raise Exception(
                     f"Destination folder {missing_folder} already exists. Skipping renaming."
                 )
             except OSError as e:
-                logging.warning(
+                raise Exception(
                     f"Error occurred while renaming {candidate} to {missing_folder}: {str(e)}"
                 )
         else:
-            logging.warning(
+            raise Exception(
                 "Ambiguity detected: multiple candidates OR multiple missing required folders."
             )
 
