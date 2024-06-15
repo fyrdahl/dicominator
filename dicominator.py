@@ -10,6 +10,7 @@ folder. It provides options to save the sorted data in various formats:
 """
 
 import argparse
+import contextlib
 import copy
 import glob
 import os
@@ -207,9 +208,12 @@ def is_flow_dataset(ds, force=False):
     if force:
         return True
     try:
-        # Check the presence of velocity encoding
         if not hasattr(ds, "SequenceName"):
             return False
+
+        with contextlib.suppress(KeyError):
+            if ds[0x0021, 0x1049].value == "FLOW_ENCODED":
+                return True
 
         try:
             _ = get_venc(ds.SequenceName)
