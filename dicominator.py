@@ -111,7 +111,7 @@ def dicominator(
     subfolders_to_process = set()
 
     for file_path in tqdm(dcm_files, desc="Processing files"):
-        with pydicom.dcmread(file_path, stop_before_pixels=True) as ds:
+        with pydicom.dcmread(file_path, stop_before_pixels=True, force=True) as ds:
             protocol_name = getattr(ds, "ProtocolName", None)
             if protocol_name:
                 base_desc = get_base_desc(ds.SeriesDescription)
