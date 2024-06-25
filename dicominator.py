@@ -469,7 +469,6 @@ def save_nii_files(output_root, image_data, tt_pat, ds_list):
         ds = ds_list[key][0]
 
         affine = affine3d(ds_list[key])
-        print(f"affine: {affine}")
         pixel_spacing = ds.PixelSpacing
         slice_thickness = ds.SliceThickness
         voxel_dims = np.array(
