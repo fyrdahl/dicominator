@@ -444,100 +444,6 @@ def sort_data(
         venc_data[key] = venc_data[key][:, idx_sort]
 
 
-def dicom_to_volume(dicom_series):
-    """Convert a DICOM series into a float32 volume with orientation.
-    The input should be a list of 'dataset' objects from pydicom.
-    The output is a tuple (voxel_array, voxel_spacing, affine_matrix)
-    """
-    # Create numpy arrays for volume, pixel spacing (ps),
-    # slice position (ipp or ImagePositionPatient), and
-    # slice orientation (iop or ImageOrientationPatient)
-    n = len(dicom_series)
-    shape = (n,) + dicom_series[0].pixel_array.shape
-    vol = np.empty(shape, dtype=np.float32)
-    ps = np.empty((n, 2), dtype=np.float64)
-    ipp = np.empty((n, 3), dtype=np.float64)
-    iop = np.empty((n, 6), dtype=np.float64)
-
-    for i, ds in enumerate(dicom_series):
-        # create a single complex-valued image from real,imag
-        image = ds.pixel_array
-        try:
-            slope = float(ds.RescaleSlope)
-        except (AttributeError, ValueError):
-            slope = 1.0
-        try:
-            intercept = float(ds.RescaleIntercept)
-        except (AttributeError, ValueError):
-            intercept = 0.0
-        vol[i, :, :] = image * slope + intercept
-        ps[i, :] = dicom_series[i].PixelSpacing
-        ipp[i, :] = dicom_series[i].ImagePositionPatient
-        iop[i, :] = dicom_series[i].ImageOrientationPatient
-
-    # create nibabel-style affine matrix and pixdim
-    # (these give DICOM LPS coords, not NIFTI RAS coords)
-    affine, pixdim = create_affine(ipp, iop, ps)
-    return vol, pixdim, affine
-
-
-def create_affine(ipp, iop, ps):
-    """Generate an affine matrix from DICOM IPP and IOP attributes.
-    The ipp (ImagePositionPatient) parameter should an Nx3 array, and
-    the iop (ImageOrientationPatient) parameter should be Nx6, where
-    N is the number of DICOM slices in the series.
-    The return values are the affine matrix and the pixdim.
-    Note the the output will use DICOM anatomical coordinates:
-    x increases towards the left, y increases towards the back.
-    """
-    # solve Ax = b where x is slope, intecept
-    n = ipp.shape[0]
-    A = np.column_stack([np.arange(n), np.ones(n)])
-    x, r, rank, s = np.linalg.lstsq(A, ipp, rcond=None)
-    # round small values to zero
-    x[(np.abs(x) < 1e-6)] = 0.0
-    vec = x[0, :]  # slope
-    pos = x[1, :]  # intercept
-
-    # pixel spacing should be the same for all image
-    spacing = np.ones(3)
-    spacing[1::-1] = ps[0, :]
-    if np.sum(np.abs(ps - spacing[1::-1])) > spacing[0] * 1e-6:
-        sys.stderr.write("Pixel spacing is inconsistent!\n")
-
-    # compute slice spacing, round to 7 decimal places
-    spacing[2] = np.round(np.sqrt(np.sum(np.square(vec))), 7)
-
-    # get the orientation
-    iop_average = np.mean(iop, axis=0)
-    u = iop_average[0:3]
-    u /= np.sqrt(np.sum(np.square(u)))
-    v = iop_average[3:6]
-    v /= np.sqrt(np.sum(np.square(v)))
-
-    # round small values to zero
-    u[(np.abs(u) < 1e-6)] = 0.0
-    v[(np.abs(v) < 1e-6)] = 0.0
-
-    # create the matrix
-    mat = np.eye(4)
-    mat[0:3, 0] = u * spacing[0]
-    mat[0:3, 1] = v * spacing[1]
-    mat[0:3, 2] = vec
-    mat[0:3, 3] = pos
-
-    # check whether slice vec is orthogonal to iop vectors
-    dv = np.dot(vec, np.cross(u, v))
-    qfac = np.sign(dv)
-    if np.abs(qfac * dv - spacing[2]) > 1e-6:
-        sys.stderr.write("Non-orthogonal volume!\n")
-
-    # compute the pixdim array, with qfac as the first element
-    pixdim = np.hstack([np.array(qfac), spacing])
-
-    return mat, pixdim
-
-
 def save_nii_files(output_root, image_data, tt_pat, ds_list):
     """
     Save the image data as NII files.
@@ -559,20 +465,9 @@ def save_nii_files(output_root, image_data, tt_pat, ds_list):
             os.makedirs(os.path.join(output_root, "nii", key))
 
         image_data_sorted = image_data[key]
-        # vol, pixdim, affine = dicom_to_volume(ds_list[key])
-        # print(f"Affine: {affine}")
-        # print(f"vol.shape: {vol.shape}")
-        # print(f"pixdim: {pixdim}")
         print(f"image_data_sorted.shape: {image_data_sorted.shape}")
         ds = ds_list[key][0]
-        # vol = vol.reshape(
-        #    image_data_sorted.shape[2],
-        #    image_data_sorted.shape[3],
-        #    image_data_sorted.shape[0],
-        #    image_data_sorted.shape[1],
-        # )
-        # vol = vol.transpose(1, 0, 2, 3)
-        # print(f"vol.shape: {vol.shape}")
+
         affine = affine3d(ds_list[key])
         print(f"affine: {affine}")
         pixel_spacing = ds.PixelSpacing
