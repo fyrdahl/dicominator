@@ -481,15 +481,10 @@ def save_nii_files(output_root, image_data, tt_pat, ds_list):
         )
 
         header = nib.Nifti1Header()
-        # header.set_data_shape(image_data_sorted.shape)
-        # header.set_data_dtype(np.float32)
-        # header.set_zooms(voxel_dims)
-        # header.set_xyzt_units(xyz="mm", t="msec")
-        # header.set_dim_info(slice=2)
-        # header["dim"][0] = 3
-        # header["dim"][1] = image_data_sorted.shape[0]
-        # header["dim"][2] = image_data_sorted.shape[1]
-        # header["dim"][3] = image_data_sorted.shape[2]
+        header.set_data_shape(image_data_sorted.shape)
+        header.set_data_dtype(np.float32)
+        header.set_zooms(voxel_dims)
+        header.set_xyzt_units(xyz="mm", t="msec")
 
         for idx, sub_volume in enumerate(image_data_sorted.transpose(3, 0, 1, 2)):
             nifti_image = nib.Nifti1Image(sub_volume, affine, header=None)
@@ -506,45 +501,41 @@ def affine3d(ds_list):
             "ds_list must contain at least two datasets to compute affine matrix"
         )
 
-    T1, T2, T3 = zip(
-        *[
-            (
-                ds.ImagePositionPatient[0],
-                ds.ImagePositionPatient[1],
-                ds.ImagePositionPatient[2],
-            )
-            for ds in ds_list
-        ]
-    )
+    # Extract image positions
+    positions = np.array([ds.ImagePositionPatient for ds in ds_list])
+    T1, T2, T3 = positions[:, 0], positions[:, 1], positions[:, 2]
 
-    F11, F21, F31 = ds_list[0].ImageOrientationPatient[3:]
-    F12, F22, F32 = ds_list[0].ImageOrientationPatient[:3]
+    # Extract orientation
+    orientation = np.array(ds_list[0].ImageOrientationPatient)
+    row_x, row_y, row_z = orientation[:3]
+    col_x, col_y, col_z = orientation[3:]
 
+    # Calculate slice direction
+    slice_x, slice_y, slice_z = np.cross([row_x, row_y, row_z], [col_x, col_y, col_z])
+
+    # Extract pixel spacing
     dr, dc = ds_list[0].PixelSpacing
 
-    dslice = 1
-    with contextlib.suppress(AttributeError):
-        dslice = ds_list[0][0x0021, 0x1012].value
+    # Try to get slice thickness
+    try:
+        dslice = float(ds_list[0].SliceThickness)
+    except AttributeError:
+        try:
+            dslice = float(ds_list[0][0x0018, 0x0050].value)
+        except KeyError:
+            dslice = np.linalg.norm(positions[-1] - positions[0]) / (N - 1)
 
-    # dT1 = np.abs(np.diff(T1)).mean()
-    # dT2 = np.abs(np.diff(T2)).mean()
-    # dT3 = np.abs(np.diff(T3)).mean()
-    dT1 = 10 * dslice * (max(T1) - min(T1)) / (N - 1)
-    dT2 = 10 * dslice * (max(T2) - min(T2)) / (N - 1)
-    dT3 = 10 * dslice * (max(T3) - min(T3)) / (N - 1)
-    # dT1 = (T1[-1] - T1[0]) / (N - 1)
-    # dT2 = (T2[-1] - T2[0]) / (N - 1)
-    # dT3 = (T3[-1] - T3[0]) / (N - 1)
-
-    # Create the affine matrix
-    return np.array(
+    # Calculate affine matrix
+    affine = np.array(
         [
-            [F11 * dr, F12 * dc, dT1, T1[0]],
-            [F21 * dr, F22 * dc, dT2, T2[0]],
-            [F31 * dr, F32 * dc, dT3, T3[0]],
+            [row_x * dr, col_x * dc, slice_x * dslice, T1[0]],
+            [row_y * dr, col_y * dc, slice_y * dslice, T2[0]],
+            [row_z * dr, col_z * dc, slice_z * dslice, T3[0]],
             [0, 0, 0, 1],
         ]
     )
+
+    return affine
 
 
 def prepare_data_for_saving(image_data, venc_data, pos_pat, tt_pat, sample_ds):
