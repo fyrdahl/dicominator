@@ -15,6 +15,7 @@ import copy
 import glob
 import os
 import re
+import unicodedata
 import shutil
 from pathlib import Path
 
@@ -125,7 +126,9 @@ def dicominator(
                             flow_status[protocol_name] = True
                             subfolders_to_process.add(base_desc)
                     else:
-                        if not description or base_desc.startswith(description):
+                        if not description or normalize_string(base_desc).startswith(
+                            normalize_string(description)
+                        ):
                             if is_flow_dataset(ds, force=force):
                                 subfolders_to_process.add(base_desc)
                             subfolder = os.path.join(
@@ -161,6 +164,25 @@ def dicominator(
                 process_and_save_data(subfolder, save_as_h5, save_as_mat, save_as_nii)
 
     logging.info("Done!")
+
+
+def normalize_string(text):
+    """
+    Normalize a string by:
+    1. Removing diacritics (accents)
+    2. Removing all non-alphanumeric characters (including spaces)
+    3. Converting to lowercase
+    """
+    # Remove diacritics (accents)
+    text = "".join(
+        c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c)
+    )
+
+    # Remove all non-alphanumeric characters (including spaces)
+    text = re.sub(r"[^a-zA-Z0-9]", "", text)
+
+    # Convert to lowercase
+    return text.lower()
 
 
 def display_descriptions(descriptions, flow_status, force):
