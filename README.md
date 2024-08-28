@@ -2,11 +2,11 @@
 
 DICOMinator is an open-source Python script for sorting images from common 4D Flow pulse sequences.
 
-## Features ✨
+## Features :sparkles:
 
 - 📂 Recursively traverses the input directory to find all DICOM files.
 - 📂 Sorts the DICOM files into a specified output directory based on encoding direction.
-- 💾 Provides options to save the sorted data in various formats:
+- :floppy_disk: Provides options to save the sorted data in various formats:
     - 📦 NIfTI: The NIfTI files are split along the time dimension, allowing them to be imported as a Sequence (or MultiVolume) in [3D Slicer](https://www.slicer.org/).
     - 📦 h5: The h5 format should be compatible with Edward Ferdian's [4DFlowNet](https://github.com/edwardferdian/4DFlowNet).
     - 📦 mat: The mat format should be compatible with Julio Sotelo's [4D-Flow-Matlab-Toolbox](https://github.com/JulioSoteloParraguez/4D-Flow-Matlab-Toolbox).
@@ -50,11 +50,11 @@ DICOMinator is an open-source Python script for sorting images from common 4D Fl
 python dicominator.py /path/to/input /path/to/output --desc "4D Flow" --nii --h5 --mat
 ```
 
-## Contact 📧
+## Contact :mailbox:
 
 For support, please contact alexander.fyrdahl@ki.se or open an issue.
 
-## Acknowledgments 🙏
+## Acknowledgments :pray:
 
 - Edward Ferdian for [4DFlowNet](https://github.com/edwardferdian/4DFlowNet)
 - Julio Sotelo for [4D-Flow-Matlab-Toolbox](https://github.com/JulioSoteloParraguez/4D-Flow-Matlab-Toolbox)
