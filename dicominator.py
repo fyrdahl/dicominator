@@ -46,7 +46,7 @@ def dicominator(
     save_as_h5=False,
     save_as_mat=False,
     save_as_nii=False,
-    save_pcmra=False,
+    save_speed=False,
     list_descriptions=False,
     force=False,
 ):
@@ -66,7 +66,7 @@ def dicominator(
         save_as_h5 (bool, optional): Whether to save the processed data in h5 format. Defaults to False.
         save_as_mat (bool, optional): Whether to save the processed data in mat format. Defaults to False.
         save_as_nii (bool, optional): Whether to save the processed data in nii format. Defaults to False.
-        save_pcmra (bool, optional): Whether to save PCMRA images in nii format. Defaults to False.
+        save_speed (bool, optional): Whether to save speed images in nii format. Defaults to False.
         list_descriptions (bool, optional): Whether to list all unique Series Descriptions in the dataset. Defaults to False.
 
     Returns:
@@ -163,7 +163,7 @@ def dicominator(
                 continue
             if save_as_h5 or save_as_mat or save_as_nii:
                 process_and_save_data(
-                    subfolder, save_as_h5, save_as_mat, save_as_nii, save_pcmra
+                    subfolder, save_as_h5, save_as_mat, save_as_nii, save_speed
                 )
 
     logging.info("Done!")
@@ -280,7 +280,7 @@ def split_and_save_multiframe_dicom(ds, base_name, output_root):
 
 
 def process_and_save_data(
-    output_root, save_as_h5, save_as_mat, save_as_nii, save_pcmra
+    output_root, save_as_h5, save_as_mat, save_as_nii, save_speed
 ):
     """
     Process the sorted DICOM files and save the data in different formats (h5, mat, nii).
@@ -291,7 +291,7 @@ def process_and_save_data(
         save_as_h5 (bool): Whether to save the processed data in h5 format.
         save_as_mat (bool): Whether to save the processed data in mat format.
         save_as_nii (bool): Whether to save the processed data in nii format.
-        save_pcmra (bool): Whether to save PCMRA images.
+        save_speed (bool): Whether to save speed images.
 
     Returns:
         None
@@ -344,7 +344,7 @@ def process_and_save_data(
         )
 
     if save_as_nii:
-        save_nii_files(output_root, image_data, tt_pat, ds_list, save_pcmra)
+        save_nii_files(output_root, image_data, tt_pat, ds_list, save_speed)
 
     if save_as_h5 or save_as_mat:
         data = prepare_data_for_saving(
@@ -472,7 +472,7 @@ def sort_data(
         venc_data[key] = venc_data[key][:, idx_sort]
 
 
-def save_nii_files(output_root, image_data, tt_pat, ds_list, save_pcmra):
+def save_nii_files(output_root, image_data, tt_pat, ds_list, save_speed):
     """
     Save the image data as NII files.
 
@@ -481,7 +481,7 @@ def save_nii_files(output_root, image_data, tt_pat, ds_list, save_pcmra):
         image_data (dict): The dictionary containing image data.
         tt_pat (dict): The dictionary containing trigger time data.
         ds_list (dict): The dictionary containing DICOM datasets.
-        save_pcmra (bool): Whether to save PCMRA images.
+        save_speed (bool): Whether to save speed images.
 
     Returns:
         None
@@ -489,19 +489,19 @@ def save_nii_files(output_root, image_data, tt_pat, ds_list, save_pcmra):
     if not os.path.exists(os.path.join(output_root, "nii")):
         os.makedirs(os.path.join(output_root, "nii"))
 
-    if save_pcmra:
+    if save_speed:
         velocity_data = np.stack(
             [image_data[key] for key in ["AP", "RL", "FH"]], axis=-1
         )
-        pcmra = np.sqrt(np.sum(velocity_data**2, axis=-1))
-        image_data["PCMRA"] = pcmra
+        speed = np.sqrt(np.sum(velocity_data**2, axis=-1))
+        image_data["speed"] = speed
 
     keys = ["MAG", "AP", "RL", "FH"]
 
-    if save_pcmra:
-        keys.append("PCMRA")
-        ds_list["PCMRA"] = ds_list["MAG"]
-        tt_pat["PCMRA"] = tt_pat["MAG"]
+    if save_speed:
+        keys.append("speed")
+        ds_list["speed"] = ds_list["MAG"]
+        tt_pat["speed"] = tt_pat["MAG"]
 
     for key in keys:
         if not os.path.exists(os.path.join(output_root, "nii", key)):
@@ -964,7 +964,7 @@ if __name__ == "__main__":
     parser.add_argument("--h5", action="store_true", help="save as h5")
     parser.add_argument("--mat", action="store_true", help="save as mat")
     parser.add_argument(
-        "--pcmra", action="store_true", help="save PCMRA images in NIfTI format"
+        "--speed", action="store_true", help="save speed images in NIfTI format"
     )
     parser.add_argument(
         "-l",
@@ -989,7 +989,7 @@ if __name__ == "__main__":
             ("--nii", args.nii),
             ("--h5", args.h5),
             ("--mat", args.mat),
-            ("--pcmra", args.pcmra),
+            ("--speed", args.speed),
         ]
         if args.list and value
     ]
@@ -1011,7 +1011,7 @@ if __name__ == "__main__":
         save_as_h5=args.h5,
         save_as_mat=args.mat,
         save_as_nii=args.nii,
-        save_pcmra=args.pcmra,
+        save_speed=args.speed,
         list_descriptions=args.list,
         force=args.force,
     )
