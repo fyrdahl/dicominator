@@ -508,10 +508,10 @@ def save_nii_files(output_root, image_data, tt_pat, ds_list, save_pcmra):
         p2 = np.percentile(pcmra, 99.8)
         pcmra[pcmra > p2] = p2
 
-        image_data["pcmra"] = pcmra
-        keys.append("pcmra")
-        ds_list["pcmra"] = ds_list["MAG"]
-        tt_pat["pcmra"] = tt_pat["MAG"]
+        image_data["PCMRA"] = pcmra
+        keys.append("PCMRA")
+        ds_list["PCMRA"] = ds_list["MAG"]
+        tt_pat["PCMRA"] = tt_pat["MAG"]
 
     for key in keys:
         if not os.path.exists(os.path.join(output_root, "nii", key)):
