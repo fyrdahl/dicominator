@@ -1016,6 +1016,12 @@ if __name__ == "__main__":
             f"The {ignored_flags_str} flag(s) will be ignored when only listing SeriesDescriptions."
         )
 
+    if args.pcmra and not args.nii and not args.list:
+        logging.warning(
+            "The --pcmra flag currently requires the --nii flag to be set. The --nii flag will be set automatically."
+        )
+        args.nii = True
+
     if args.purge and args.output_root and not args.list:
         logging.info(f"Purging output folder {args.output_root}...")
         shutil.rmtree(args.output_root, ignore_errors=True)
