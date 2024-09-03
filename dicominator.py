@@ -47,6 +47,7 @@ def dicominator(
     save_as_mat=False,
     save_as_nii=False,
     save_pcmra=False,
+    save_cine=False,
     list_descriptions=False,
     force=False,
 ):
@@ -111,6 +112,7 @@ def dicominator(
 
     descriptions = set()
     flow_status = {}
+    cine_status = {}
     subfolders_to_process = set()
 
     for file_path in tqdm(dcm_files, desc="Processing files"):
@@ -120,18 +122,27 @@ def dicominator(
                 base_desc = get_base_desc(ds.SeriesDescription)
                 descriptions.add(ds.SeriesDescription)
 
-                if list_descriptions or is_flow_dataset(ds, force=force):
+                if (
+                    list_descriptions
+                    or is_flow_dataset(ds, force=force)
+                    or is_cine_dataset(ds)
+                ):
                     if list_descriptions:
                         if protocol_name not in flow_status:
                             flow_status[protocol_name] = False
                         if is_flow_dataset(ds, force=force):
                             flow_status[protocol_name] = True
                             subfolders_to_process.add(base_desc)
+                        elif is_cine_dataset(ds):
+                            cine_status[protocol_name] = True
+                            subfolders_to_process.add(base_desc)
                     else:
                         if not description or normalize_string(base_desc).startswith(
                             normalize_string(description)
                         ):
                             if is_flow_dataset(ds, force=force):
+                                subfolders_to_process.add(base_desc)
+                            elif is_cine_dataset(ds):
                                 subfolders_to_process.add(base_desc)
                             subfolder = os.path.join(
                                 output_root, sanitize_name(base_desc)
@@ -151,7 +162,7 @@ def dicominator(
                                     if output_path:
                                         save_dicom(ds, output_path, base_name)
     if list_descriptions:
-        display_descriptions(descriptions, flow_status, force)
+        display_descriptions(descriptions, flow_status, cine_status, force)
     else:
         # Perform post-processing steps for each processed subfolder
         for series_description in subfolders_to_process:
@@ -188,7 +199,7 @@ def normalize_string(text):
     return text.lower()
 
 
-def display_descriptions(descriptions, flow_status, force):
+def display_descriptions(descriptions, flow_status, cine_status, force):
     unique_descriptions = {
         desc
         for desc in sorted(descriptions)
@@ -204,6 +215,12 @@ def display_descriptions(descriptions, flow_status, force):
             if protocol_name.startswith(desc)
         ):
             logging.info(f"- {desc} (Likely a flow dataset)")
+        elif any(
+            cine_status[protocol_name]
+            for protocol_name in cine_status
+            if protocol_name.startswith(desc)
+        ):
+            logging.info(f"- {desc} (Likely a cine dataset)")
         else:
             logging.info(f"- {desc}")
 
@@ -257,6 +274,42 @@ def is_flow_dataset(ds, force=False):
         return False
 
 
+def is_cine_dataset(ds):
+    """
+    Check if a DICOM dataset is likely to be a cine dataset.
+
+    Args:
+        ds (pydicom.Dataset): The DICOM dataset to examine.
+
+    Returns:
+        bool: True if the dataset is likely to be a cine dataset, False otherwise.
+    """
+    if not hasattr(ds, "SequenceName"):
+        return False
+
+    with contextlib.suppress(KeyError):
+        if "CINE" in ds[0x0021, 0x1175]:
+            return True
+
+    # Check the presence of required tags for processing
+    required_tags = [
+        "PixelSpacing",
+        "SliceThickness",
+        "TriggerTime",
+        "Rows",
+        "Columns",
+    ]
+    missing_tags = [tag for tag in required_tags if not hasattr(ds, tag)]
+    if missing_tags:
+        return False
+
+    return True
+
+
+# except AttributeError:
+#       return False
+
+
 def split_and_save_multiframe_dicom(ds, base_name, output_root):
     """
     Split a multiframe DICOM dataset into single frames and save each frame as a separate DICOM file.
@@ -300,8 +353,13 @@ def process_and_save_data(
         return
 
     file_name = os.path.basename(output_root)
-    processed_files = glob.glob(os.path.join(output_root, "**/*"), recursive=True)
-    processed_files = [f for f in processed_files if os.path.isfile(f)]
+    all_items = glob.glob(os.path.join(output_root, "**"), recursive=True)
+    processed_files = [f for f in all_items if os.path.isfile(f)]
+    directories = [d for d in all_items if os.path.isdir(d)]
+    dir_count = sum(
+        1 for d in directories if os.path.basename(d) in ["MAG", "AP", "FH", "RL"]
+    )
+    dir_count = dir_count - 1 if dir_count > 1 else 1
 
     logging.info(
         f"Found {len(processed_files)} files with SeriesDescription {file_name}"
@@ -314,13 +372,13 @@ def process_and_save_data(
         num_cardiac_phases = int(sample_ds.CardiacNumberOfImages)
     else:
         num_cardiac_phases = 1
-    num_slices = int(len(processed_files) / num_cardiac_phases / 4)
+    num_slices = int(len(processed_files) / num_cardiac_phases / dir_count)
     logging.info(
         f"Dataset has {num_slices} slices with {num_cardiac_phases} cardiac phases"
     )
 
     rows, cols = sample_ds.Rows, sample_ds.Columns
-    images_tot = len(processed_files) // 4
+    images_tot = len(processed_files) // dir_count
 
     image_data, venc_data, pos_pat, tt_pat, count, ds_list = initialize_data_structures(
         rows, cols, images_tot
@@ -454,22 +512,25 @@ def sort_data(
     Returns:
         None
     """
-    slice_dir = np.argmax(np.mean(np.abs(np.diff(pos_pat[key], axis=1)), axis=1))
-    slice_indices = np.argsort(pos_pat[key][slice_dir, :])
-    tt_sorted_indices = np.argsort(
-        tt_pat[key][:, slice_indices].reshape(num_slices, num_cardiac_phases),
-        axis=1,
-    )
-    idx_sort = slice_indices.reshape(num_slices, num_cardiac_phases)[
-        np.arange(num_slices)[:, None], tt_sorted_indices
-    ]
+    try:
+        slice_dir = np.argmax(np.mean(np.abs(np.diff(pos_pat[key], axis=1)), axis=1))
+        slice_indices = np.argsort(pos_pat[key][slice_dir, :])
+        tt_sorted_indices = np.argsort(
+            tt_pat[key][:, slice_indices].reshape(num_slices, num_cardiac_phases),
+            axis=1,
+        )
+        idx_sort = slice_indices.reshape(num_slices, num_cardiac_phases)[
+            np.arange(num_slices)[:, None], tt_sorted_indices
+        ]
 
-    image_data[key] = image_data[key][:, :, idx_sort]
-    pos_pat[key] = pos_pat[key][:, idx_sort]
-    tt_pat[key] = tt_pat[key][:, idx_sort]
-    ds_list[key] = [ds_list[key][int(i)] for i in idx_sort.ravel()]
-    if key != "MAG":
-        venc_data[key] = venc_data[key][:, idx_sort]
+        image_data[key] = image_data[key][:, :, idx_sort]
+        pos_pat[key] = pos_pat[key][:, idx_sort]
+        tt_pat[key] = tt_pat[key][:, idx_sort]
+        ds_list[key] = [ds_list[key][int(i)] for i in idx_sort.ravel()]
+        if key != "MAG":
+            venc_data[key] = venc_data[key][:, idx_sort]
+    except:
+        logging.error(f"Failed to sort {key} data, perhaps this is a cine dataset?")
 
 
 def save_nii_files(output_root, image_data, tt_pat, ds_list, save_pcmra):
@@ -492,19 +553,46 @@ def save_nii_files(output_root, image_data, tt_pat, ds_list, save_pcmra):
     keys = ["MAG", "AP", "RL", "FH"]
 
     if save_pcmra:
+        for key in ["AP", "RL", "FH"]:
+            flow = image_data[key]
+            print(f"Max flow {key}: {np.max(flow)}")
+            print(f"Median flow {key}: {np.median(flow)}")
+            print(f"Min flow {key}: {np.min(flow)}")
+        venc = get_venc(ds_list["FH"][0].SequenceName)
+        print(f"VENC: {venc}")
         velocity_data = np.stack(
-            [image_data[key] for key in ["AP", "RL", "FH"]],
+            [(image_data[key] - 2048) / 4095 * venc for key in ["AP", "RL", "FH"]],
             axis=-1,
         )
+        for i in range(3):
+            print(f"Max velocity {i}: {np.max(velocity_data[..., i])}")
+            print(f"Median velocity {i}: {np.median(velocity_data[..., i])}")
+            print(f"Min velocity {i}: {np.min(velocity_data[..., i])}")
         speed = np.sqrt(np.sum(velocity_data**2, axis=-1))
-
+        print(f"Max speed: {np.max(speed)}")
+        print(f"Min speed: {np.min(speed)}")
+        diff_threshold = 250
+        speed_mean_diff = np.mean(np.abs(np.diff(speed, 3)), 3)
+        speed[(speed_mean_diff > diff_threshold)] = 0
+        print(f"Max speed: {np.max(speed)}")
+        print(f"Min speed: {np.min(speed)}")
         mag_data = image_data["MAG"]
         min_mag = np.min(0.7 * mag_data)
         max_mag = np.max(0.7 * mag_data)
         mag_data = np.clip(mag_data, min_mag, max_mag)
         mag_data = (mag_data - min_mag) / (max_mag - min_mag)
 
-        pcmra = np.mean((speed * mag_data) ** 2, axis=-1)
+        # pcmra = np.mean(
+        #    (speed[..., speed_start:speed_end] * mag_data[..., speed_start:speed_end])
+        #    ** 2,
+        #    axis=-1,
+        # )
+
+        # Pseudo complex difference
+        pcmra = np.where(
+            speed >= venc, mag_data, mag_data * np.sin(np.pi * speed / (2 * venc))
+        )
+        pcmra = np.mean(pcmra, axis=-1)
         p2 = np.percentile(pcmra, 99.8)
         pcmra[pcmra > p2] = p2
 
@@ -514,6 +602,9 @@ def save_nii_files(output_root, image_data, tt_pat, ds_list, save_pcmra):
         tt_pat["PCMRA"] = tt_pat["MAG"]
 
     for key in keys:
+        if ds_list[key] == []:
+            continue
+
         if not os.path.exists(os.path.join(output_root, "nii", key)):
             os.makedirs(os.path.join(output_root, "nii", key))
 
@@ -778,10 +869,16 @@ def validate_folder_structure(subfolder_root):
     """
 
     existing_folders = set(os.listdir(subfolder_root))
+    if subfolder_root.endswith("_InlineVF"):
+        raise Exception("This is an InlineVF folder, skipping...")
 
     # Check if the required folder MAG exists
     if "MAG" not in existing_folders:
         raise Exception("Non-compliant folder structure. Missing required folder: MAG")
+
+    # Check if MAG is the only folder
+    if existing_folders == {"MAG"}:
+        return
 
     rename_candidates = {"IN", "THROUGH"}
     required_folders = {"AP", "RL", "FH"}
@@ -819,7 +916,7 @@ def validate_folder_structure(subfolder_root):
     if missing_required_folders:
         missing_folders_str = ", ".join(missing_required_folders)
         raise Exception(
-            f"Non-compliant folder structure. Missing folders: {missing_folders_str}"
+            f"Non-compliant folder structure for 4D Flow. Missing folders: {missing_folders_str}"
         )
 
 
@@ -983,6 +1080,9 @@ if __name__ == "__main__":
         "--pcmra", action="store_true", help="save pcmra images in NIfTI format"
     )
     parser.add_argument(
+        "--cine", action="store_true", help="save cine images in NIfTI format"
+    )
+    parser.add_argument(
         "-l",
         "--list",
         action="store_true",
@@ -1006,6 +1106,7 @@ if __name__ == "__main__":
             ("--h5", args.h5),
             ("--mat", args.mat),
             ("--pcmra", args.pcmra),
+            ("--cine", args.pcmra),
         ]
         if args.list and value
     ]
@@ -1034,6 +1135,7 @@ if __name__ == "__main__":
         save_as_mat=args.mat,
         save_as_nii=args.nii,
         save_pcmra=args.pcmra,
+        save_cine=args.cine,
         list_descriptions=args.list,
         force=args.force,
     )

@@ -42,6 +42,7 @@ DICOMinator is an open-source Python script for sorting images from common 4D Fl
 - `--h5`: Save as h5.
 - `--mat`: Save as mat.
 - `--pcmra`: Save PCMRA image in NIfTI format
+- `--cine`: [EXPERIMENTAL] Process cine images through the 4DFlow pipeline
 - `-l`, `--list`: List all unique Series Descriptions in the dataset without further processing.
 - `-f`, `--force`: Force process files thay may or may not be flow datasets.
 
