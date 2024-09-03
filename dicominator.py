@@ -355,11 +355,10 @@ def process_and_save_data(
     file_name = os.path.basename(output_root)
     all_items = glob.glob(os.path.join(output_root, "**"), recursive=True)
     processed_files = [f for f in all_items if os.path.isfile(f)]
-    directories = [d for d in all_items if os.path.isdir(d)]
-    dir_count = sum(
-        1 for d in directories if os.path.basename(d) in ["MAG", "AP", "FH", "RL"]
-    )
-    dir_count = dir_count - 1 if dir_count > 1 else 1
+    found_dirs = {os.path.basename(d) for d in all_items if os.path.isdir(d)}
+    target_dirs = {"MAG", "AP", "RL", "FH"}
+    dir_count = len(found_dirs.intersection(target_dirs))
+    dir_count = 4 if dir_count == len(target_dirs) else 1
 
     logging.info(
         f"Found {len(processed_files)} files with SeriesDescription {file_name}"
@@ -565,12 +564,7 @@ def save_nii_files(output_root, image_data, tt_pat, ds_list, save_pcmra):
         mag_data = np.clip(mag_data, min_mag, max_mag)
         mag_data = (mag_data - min_mag) / (max_mag - min_mag)
 
-        pcmra = np.mean(
-            (speed * mag_data) ** 2,
-            axis=-1,
-        )
-
-        pcmra = np.mean(pcmra, axis=-1)
+        pcmra = np.mean((speed * mag_data) ** 2, axis=-1)
         p2 = np.percentile(pcmra, 99.8)
         pcmra[pcmra > p2] = p2
 
