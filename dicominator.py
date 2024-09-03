@@ -553,45 +553,23 @@ def save_nii_files(output_root, image_data, tt_pat, ds_list, save_pcmra):
     keys = ["MAG", "AP", "RL", "FH"]
 
     if save_pcmra:
-        for key in ["AP", "RL", "FH"]:
-            flow = image_data[key]
-            print(f"Max flow {key}: {np.max(flow)}")
-            print(f"Median flow {key}: {np.median(flow)}")
-            print(f"Min flow {key}: {np.min(flow)}")
-        venc = get_venc(ds_list["FH"][0].SequenceName)
-        print(f"VENC: {venc}")
         velocity_data = np.stack(
-            [(image_data[key] - 2048) / 4095 * venc for key in ["AP", "RL", "FH"]],
+            [image_data[key] for key in ["AP", "RL", "FH"]],
             axis=-1,
         )
-        for i in range(3):
-            print(f"Max velocity {i}: {np.max(velocity_data[..., i])}")
-            print(f"Median velocity {i}: {np.median(velocity_data[..., i])}")
-            print(f"Min velocity {i}: {np.min(velocity_data[..., i])}")
         speed = np.sqrt(np.sum(velocity_data**2, axis=-1))
-        print(f"Max speed: {np.max(speed)}")
-        print(f"Min speed: {np.min(speed)}")
-        diff_threshold = 250
-        speed_mean_diff = np.mean(np.abs(np.diff(speed, 3)), 3)
-        speed[(speed_mean_diff > diff_threshold)] = 0
-        print(f"Max speed: {np.max(speed)}")
-        print(f"Min speed: {np.min(speed)}")
+
         mag_data = image_data["MAG"]
         min_mag = np.min(0.7 * mag_data)
         max_mag = np.max(0.7 * mag_data)
         mag_data = np.clip(mag_data, min_mag, max_mag)
         mag_data = (mag_data - min_mag) / (max_mag - min_mag)
 
-        # pcmra = np.mean(
-        #    (speed[..., speed_start:speed_end] * mag_data[..., speed_start:speed_end])
-        #    ** 2,
-        #    axis=-1,
-        # )
-
-        # Pseudo complex difference
-        pcmra = np.where(
-            speed >= venc, mag_data, mag_data * np.sin(np.pi * speed / (2 * venc))
+        pcmra = np.mean(
+            (speed * mag_data) ** 2,
+            axis=-1,
         )
+
         pcmra = np.mean(pcmra, axis=-1)
         p2 = np.percentile(pcmra, 99.8)
         pcmra[pcmra > p2] = p2
