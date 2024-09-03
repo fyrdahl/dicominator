@@ -552,26 +552,30 @@ def save_nii_files(output_root, image_data, tt_pat, ds_list, save_pcmra):
     keys = ["MAG", "AP", "RL", "FH"]
 
     if save_pcmra:
-        velocity_data = np.stack(
-            [image_data[key] for key in ["AP", "RL", "FH"]],
-            axis=-1,
-        )
-        speed = np.sqrt(np.sum(velocity_data**2, axis=-1))
+        velocity_data = [image_data[key] for key in ["AP", "RL", "FH"]]
+        if any(np.all(dir == 0) for dir in velocity_data):
+            for i, key in enumerate(["AP", "RL", "FH"]):
+                if np.all(velocity_data[i] == 0):
+                    logging.info(
+                        f"Velocity data {key} is zero, skipping PCMRA calculation"
+                    )
+        else:
+            velocity_data = np.stack(velocity_data, axis=-1)
+            speed = np.sqrt(np.sum(velocity_data**2, axis=-1))
+            mag_data = image_data["MAG"]
+            min_mag = np.min(0.7 * mag_data)
+            max_mag = np.max(0.7 * mag_data)
+            mag_data = np.clip(mag_data, min_mag, max_mag)
+            mag_data = (mag_data - min_mag) / (max_mag - min_mag)
 
-        mag_data = image_data["MAG"]
-        min_mag = np.min(0.7 * mag_data)
-        max_mag = np.max(0.7 * mag_data)
-        mag_data = np.clip(mag_data, min_mag, max_mag)
-        mag_data = (mag_data - min_mag) / (max_mag - min_mag)
+            pcmra = np.mean((speed * mag_data) ** 2, axis=-1)
+            p2 = np.percentile(pcmra, 99.8)
+            pcmra[pcmra > p2] = p2
 
-        pcmra = np.mean((speed * mag_data) ** 2, axis=-1)
-        p2 = np.percentile(pcmra, 99.8)
-        pcmra[pcmra > p2] = p2
-
-        image_data["PCMRA"] = pcmra
-        keys.append("PCMRA")
-        ds_list["PCMRA"] = ds_list["MAG"]
-        tt_pat["PCMRA"] = tt_pat["MAG"]
+            image_data["PCMRA"] = pcmra
+            keys.append("PCMRA")
+            ds_list["PCMRA"] = ds_list["MAG"]
+            tt_pat["PCMRA"] = tt_pat["MAG"]
 
     for key in keys:
         if ds_list[key] == []:
