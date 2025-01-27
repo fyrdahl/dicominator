@@ -307,7 +307,7 @@ def process_and_save_data(
         f"Found {len(processed_files)} files with SeriesDescription {file_name}"
     )
 
-    sample_ds = pydicom.read_file(processed_files[0])
+    sample_ds = pydicom.dcmread(processed_files[0])
     if hasattr(sample_ds, "NumberOfTemporalPositions"):
         num_cardiac_phases = int(sample_ds.NumberOfTemporalPositions)
     elif hasattr(sample_ds, "CardiacNumberOfImages"):
@@ -418,7 +418,7 @@ def process_file(file_path, image_data, venc_data, pos_pat, tt_pat, count, ds_li
         None
     """
     file_path = Path(file_path)
-    ds = pydicom.read_file(file_path)
+    ds = pydicom.dcmread(file_path)
     parent_name = file_path.parent.name
 
     if parent_name in ["MAG", "AP", "RL", "FH"]:
